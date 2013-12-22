@@ -5,12 +5,17 @@
 #include <libmints/mints.h>
 #include <libpsio/psio.hpp>
 #include <libchkpt/chkpt.hpp>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream>
 
 INIT_PLUGIN
 
 using namespace boost;
+using namespace std;
 
-namespace psi{ namespace mos {
+namespace psi{ namespace psi4_gamess_mos {
 
 extern "C" 
 int read_options(std::string name, Options& options)
@@ -24,7 +29,7 @@ int read_options(std::string name, Options& options)
 }
 
 extern "C" 
-PsiReturnType mos(Options& options)
+PsiReturnType psi4_gamess_mos(Options& options)
 {
     int print = options.get_int("PRINT");
 
@@ -39,10 +44,8 @@ PsiReturnType mos(Options& options)
     fprintf(outfile, "Number of SOs = %d\n", nso = chkpt->rd_nso());
     fprintf(outfile, "Number of MOs = %d\n", nmo = chkpt->rd_nmo());
 
-    SharedMatrix scf_SO = wfn->Ca_subset("SO", "ALL");
+    SharedMatrix scf_SO = wfn->Ca_subset("SO", "ALL"); // AO vs. SO definition in PSI4 is screwed up
     scf_SO->print(outfile);
-//    boost::shared_ptr<Matrix> aotoso = wfn->aotoso();
-//    aotoso->print(outfile);
 
     boost::shared_ptr<BasisSet> basisset = wfn->basisset();
     boost::shared_ptr<IntegralFactory> integral = wfn->integral();
@@ -53,6 +56,24 @@ PsiReturnType mos(Options& options)
     SharedMatrix scf_AO(new Matrix("SCF AO x MO", nao, nmo));
     scf_AO->gemm(false, false, 1.0, aotoso, scf_SO, 0.0);
     scf_AO->print(outfile);   
+
+    // Read MO data from GAMESS output file
+    ifstream input;
+    input.open("mos.txt");
+    if(!input.good()) throw PSIEXCEPTION("Error opening potential.dx.");
+    char buf[512];
+    while(!input.eof()) {
+      input.getline(buf, 512);  // grab a line from input
+      stringstream cppbuf(buf);
+      string token;
+      vector<string> tokens;
+      while(cppbuf >> token) tokens.push_back(token);
+      if(tokens.size()) { // skip blank lines
+        fprintf(outfile, "%s\n", tokens[0].c_str());
+      }
+    }
+
+    input.close();
 
     return Success;
 }

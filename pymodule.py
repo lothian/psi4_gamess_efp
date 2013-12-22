@@ -11,11 +11,11 @@ import p4util
 from psiexceptions import *
 
 
-def run_mos(name, **kwargs):
+def run_psi4_gamess_mos(name, **kwargs):
     r"""Function encoding sequence of PSI module and plugin calls so that
     mos can be called via :py:func:`~driver.energy`. For post-scf plugins.
 
-    >>> energy('mos')
+    >>> energy('psi4_gamess_mos')
 
     """
     lowername = name.lower()
@@ -25,12 +25,12 @@ def run_mos(name, **kwargs):
     psi4.set_global_option('BASIS', 'sto-3g')
     psi4.set_local_option('MOS', 'PRINT', 1)
     scf_helper(name, **kwargs)
-    returnvalue = psi4.plugin('mos.so')
+    returnvalue = psi4.plugin('psi4_gamess_mos.so')
     psi4.set_variable('CURRENT ENERGY', returnvalue)
 
 
 # Integration with driver routines
-procedures['energy']['mos'] = run_mos
+procedures['energy']['psi4_gamess_mos'] = run_psi4_gamess_mos
 
 
 def exampleFN():
