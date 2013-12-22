@@ -20,7 +20,7 @@ namespace psi{ namespace psi4_gamess_mos {
 extern "C" 
 int read_options(std::string name, Options& options)
 {
-    if (name == "MOS"|| options.read_globals()) {
+    if (name == "PSI4_GAMESS_MOS"|| options.read_globals()) {
         /*- The amount of information printed to the output file -*/
         options.add_int("PRINT", 1);
     }
@@ -45,23 +45,24 @@ PsiReturnType psi4_gamess_mos(Options& options)
     fprintf(outfile, "Number of MOs = %d\n", nmo = chkpt->rd_nmo());
 
     SharedMatrix scf_SO = wfn->Ca_subset("SO", "ALL"); // AO vs. SO definition in PSI4 is screwed up
-    scf_SO->print(outfile);
+    // scf_SO->print(outfile);
 
     boost::shared_ptr<BasisSet> basisset = wfn->basisset();
     boost::shared_ptr<IntegralFactory> integral = wfn->integral();
     PetiteList petite(basisset, integral, true);
     SharedMatrix aotoso = petite.aotoso();
-    aotoso->print(outfile);
+    // aotoso->print(outfile);
 
     SharedMatrix scf_AO(new Matrix("SCF AO x MO", nao, nmo));
     scf_AO->gemm(false, false, 1.0, aotoso, scf_SO, 0.0);
-    scf_AO->print(outfile);   
+    // scf_AO->print(outfile);   
 
     // Read MO data from GAMESS output file
     ifstream input;
     input.open("mos.txt");
-    if(!input.good()) throw PSIEXCEPTION("Error opening potential.dx.");
+    if(!input.good()) throw PSIEXCEPTION("Error opening mos.txt file.");
     char buf[512];
+    SharedVector energies = SharedVector(new Vector("MO Energies", nmo));
     while(!input.eof()) {
       input.getline(buf, 512);  // grab a line from input
       stringstream cppbuf(buf);
@@ -69,6 +70,7 @@ PsiReturnType psi4_gamess_mos(Options& options)
       vector<string> tokens;
       while(cppbuf >> token) tokens.push_back(token);
       if(tokens.size()) { // skip blank lines
+        
         fprintf(outfile, "%s\n", tokens[0].c_str());
       }
     }
