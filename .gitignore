@@ -5,3 +5,4 @@ output.dat
 psi.timer.dat
 psi4_gamess_mos.so
 pymodule.pyc
+*.swp
