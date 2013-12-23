@@ -63,16 +63,22 @@ PsiReturnType psi4_gamess_mos(Options& options)
     if(!input.good()) throw PSIEXCEPTION("Error opening mos.txt file.");
     char buf[512];
     SharedVector energies = SharedVector(new Vector("MO Energies", nmo));
+    int line_count = 0;
     while(!input.eof()) {
       input.getline(buf, 512);  // grab a line from input
       stringstream cppbuf(buf);
       string token;
       vector<string> tokens;
       while(cppbuf >> token) tokens.push_back(token);
-      if(tokens.size()) { // skip blank lines
-        
-        fprintf(outfile, "%s\n", tokens[0].c_str());
+      if(!tokens.size()) { // skip blank lines and mark start of data-block
+        line_count = 0;
+        continue; 
       }
+      else if(line_count == 1) { // Grab MO energies
+      }
+      else if(line_count > 1) {
+      }
+      else line_count++;
     }
 
     input.close();
