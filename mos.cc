@@ -54,7 +54,7 @@ PsiReturnType psi4_gamess_mos(Options& options)
     // aotoso->print(outfile);
 
     SharedMatrix scf_AO(new Matrix("SCF AO x MO", nao, nmo));
-    scf_AO->gemm(false, false, 1.0, aotoso, scf_SO, 0.0);
+//    scf_AO->gemm(false, false, 1.0, aotoso, scf_SO, 0.0);
     // scf_AO->print(outfile);   
 
     // Read MO data from GAMESS output file
@@ -64,22 +64,38 @@ PsiReturnType psi4_gamess_mos(Options& options)
     char buf[512];
     SharedVector energies = SharedVector(new Vector("MO Energies", nmo));
     int line_count = 0;
+    int block_count = 0;
     while(!input.eof()) {
       input.getline(buf, 512);  // grab a line from input
       stringstream cppbuf(buf);
       string token;
       vector<string> tokens;
       while(cppbuf >> token) tokens.push_back(token);
-      if(!tokens.size()) { // skip blank lines and mark start of data-block
-        line_count = 0;
-        continue; 
+      fprintf(outfile, "line = %d\n", line_count);
+      fprintf(outfile, "block = %d\n", block_count);
+      int mo_min = block_count * 5;
+      int mo_max = mo_min + ((block_count == nmo/5) ? (nmo % mo_min) : 4);
+      fprintf(outfile, "mo_min = %d\n", mo_min);
+      fprintf(outfile, "mo_max = %d\n", mo_max);
+
+      if(line_count == 1) { // Grab MO energies
+        for(int i=mo_min; i <= mo_max; i++)
+          energies->set(i,atof(tokens[i % 5].c_str()));
+        line_count++;
       }
-      else if(line_count == 1) { // Grab MO energies
-      }
-      else if(line_count > 1) {
+      else if(line_count == (nao+3)) { block_count++; line_count++; }
+      else if(line_count > 2 && line_count < (3+nao)) {
+        for(int i=mo_min; i <= mo_max; i++)
+          scf_AO->set(line_count-3, i, atof(tokens[(i % 5) + 4].c_str()));
+        line_count++;
       }
       else line_count++;
+      // skip blank lines and mark start of data-block
+      if(!tokens.size()) line_count = 0;
     }
+ 
+    energies->print(outfile);
+    scf_AO->print(outfile);
 
     input.close();
 
