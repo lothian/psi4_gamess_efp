@@ -5,21 +5,34 @@ sys.path.insert(0, './..')
 import psi4_gamess_mos
 
 molecule {
+N    3.5438524464        2.3203890756        0.6793824427
+H    3.0684312573        3.0104729663       -0.9890624524
+H    5.4211936135        2.5574601073        0.8114306844
+H    2.8590134498        3.6437006142        1.8513012349
+units bohr
 symmetry c1
-N  1.8753260893   1.2278971082   0.3595137322
-H  1.6237440122   1.5930738032  -0.5233893479
-H  2.8687723240   1.3533497046   0.4293906575
-H  1.5129248729   1.9281634681   0.9796664950
+no_reorient
+no_com
 }
 
 set {
   basis aug-cc-pVDZ
+  print 3
 }
 
 set mos {
   print 1
 }
 
-energy('scf')
+#energy('ccsd')
+
+scf_helper('ccsd')
+mints = psi4.MintsHelper()
+mints.integrals()
 plugin("./psi4_gamess_mos.so")
+psi4.transqt2()
+psi4.ccsort()
+#psi4.ccenergy()
+
+
 

@@ -5,6 +5,7 @@
 #include <libmints/mints.h>
 #include <libpsio/psio.hpp>
 #include <libchkpt/chkpt.hpp>
+#include <libciomr/libciomr.h>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -44,8 +45,13 @@ PsiReturnType psi4_gamess_mos(Options& options)
     fprintf(outfile, "Number of SOs = %d\n", nso = chkpt->rd_nso());
     fprintf(outfile, "Number of MOs = %d\n", nmo = chkpt->rd_nmo());
 
+    double **scf_old = chkpt->rd_scf();
+//    fprintf(outfile, "SCF Matrix from Checkpoint File:\n");
+//    print_mat(scf_old, nso, nmo, outfile);
+    free_block(scf_old);
+
     SharedMatrix scf_SO = wfn->Ca_subset("SO", "ALL"); // AO vs. SO definition in PSI4 is screwed up
-    // scf_SO->print(outfile);
+    scf_SO->print(outfile);
 
     boost::shared_ptr<BasisSet> basisset = wfn->basisset();
     boost::shared_ptr<IntegralFactory> integral = wfn->integral();
@@ -54,8 +60,8 @@ PsiReturnType psi4_gamess_mos(Options& options)
     // aotoso->print(outfile);
 
     SharedMatrix scf_AO(new Matrix("SCF AO x MO", nao, nmo));
-//    scf_AO->gemm(false, false, 1.0, aotoso, scf_SO, 0.0);
-    // scf_AO->print(outfile);   
+    scf_AO->gemm(false, false, 1.0, aotoso, scf_SO, 0.0);
+    scf_AO->print(outfile);   
 
     // Read MO data from GAMESS output file
     ifstream input;
@@ -71,12 +77,8 @@ PsiReturnType psi4_gamess_mos(Options& options)
       string token;
       vector<string> tokens;
       while(cppbuf >> token) tokens.push_back(token);
-      fprintf(outfile, "line = %d\n", line_count);
-      fprintf(outfile, "block = %d\n", block_count);
       int mo_min = block_count * 5;
       int mo_max = mo_min + ((block_count == nmo/5) ? (nmo % mo_min) : 4);
-      fprintf(outfile, "mo_min = %d\n", mo_min);
-      fprintf(outfile, "mo_max = %d\n", mo_max);
 
       if(line_count == 1) { // Grab MO energies
         for(int i=mo_min; i <= mo_max; i++)
@@ -95,9 +97,25 @@ PsiReturnType psi4_gamess_mos(Options& options)
     }
  
     energies->print(outfile);
-    scf_AO->print(outfile);
+    chkpt->wt_evals(energies->pointer());
+//    scf_AO->print(outfile);
 
     input.close();
+
+    // Transform scf_AO to scf_SO
+//    SharedMatrix scf_SO(new Matrix("SCF SO x MO", nso, nmo));
+//    scf_SO->gemm(true, false, 1.0, aotoso, scf_AO, 0.0);
+//    scf_SO->print(outfile);
+
+    double **p_scf_SO = scf_SO->pointer();
+    chkpt->wt_scf(p_scf_SO);   
+    chkpt->wt_alpha_scf(p_scf_SO);   
+
+    // Check to make sure it worked
+    double **scf_new = chkpt->rd_alpha_scf();
+//    fprintf(outfile, "SCF Matrix from Checkpoint File:\n");
+//    print_mat(scf_new, nso, nmo, outfile);
+    free_block(scf_new);
 
     return Success;
 }
