@@ -18,10 +18,10 @@ no_com
 set {
   basis aug-cc-pVDZ
   print 3
-}
-
-set mos {
-  print 1
+  df_scf_guess false
+  scf_type pk
+  d_convergence 10
+  gamess_output_file gamess.out
 }
 
 #energy('ccsd')
@@ -30,8 +30,8 @@ scf_helper('ccsd')
 mints = psi4.MintsHelper()
 mints.integrals()
 plugin("./psi4_gamess_mos.so")
-psi4.transqt2()
-psi4.ccsort()
+#psi4.transqt2()
+#psi4.ccsort()
 #psi4.ccenergy()
 
 
