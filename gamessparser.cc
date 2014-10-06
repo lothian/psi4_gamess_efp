@@ -66,12 +66,12 @@ GamessOutputParser::parse_H(std::ifstream &gamessout)
 #if 0
     std::vector< std::vector<double> >::const_iterator row_iter;
     std::vector<double>::const_iterator col_iter;
-    fprintf(outfile, "\nH parsed from file, in GAMESS format\n");
+    outfile->Printf("\nH parsed from file, in GAMESS format\n");
     for(row_iter = gamess_H.begin(); row_iter < gamess_H.end(); ++row_iter){
         for(col_iter = row_iter->begin(); col_iter < row_iter->end(); ++col_iter){
-            fprintf(outfile, "%9.6f ", *col_iter);
+            outfile->Printf("%9.6f ", *col_iter);
         }
-        fprintf(outfile, "\n");
+        outfile->Printf("\n");
     }
 #endif
     nso_ = gamess_H.size();
@@ -126,14 +126,14 @@ GamessOutputParser::parse_mos(std::ifstream &gamessout)
         }
     }
 #if 0
-    fprintf(outfile, "\nMOs parsed from file, in GAMESS format\n");
+    outfile->Printf("\nMOs parsed from file, in GAMESS format\n");
     std::vector< std::vector<double> >::const_iterator row_iter;
     std::vector<double>::const_iterator col_iter;
     for(row_iter = gamess_mos.begin(); row_iter < gamess_mos.end(); ++row_iter){
         for(col_iter = row_iter->begin(); col_iter < row_iter->end(); ++col_iter){
-            fprintf(outfile, "%9.6f ", *col_iter);
+            outfile->Printf("%9.6f ", *col_iter);
         }
-        fprintf(outfile, "\n");
+        outfile->Printf("\n");
     }
 #endif
     if(nso_ != gamess_mos.size()){

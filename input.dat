@@ -2,7 +2,7 @@
 # PYTHONPATH must include directory above plugin directory.
 #     Define either externally or here, then import plugin.
 sys.path.insert(0, './..')
-import psi4_gamess_mos
+import psi4_gamess_efp
 
 molecule {
 N    3.5438524464        2.3203890756        0.6793824427
@@ -29,10 +29,5 @@ set {
 scf_helper('ccsd')
 mints = psi4.MintsHelper()
 mints.integrals()
-plugin("./psi4_gamess_mos.so")
+plugin("./psi4_gamess_efp.so")
 #psi4.transqt2()
-#psi4.ccsort()
-#psi4.ccenergy()
-
-
-
