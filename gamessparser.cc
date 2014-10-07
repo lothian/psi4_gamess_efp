@@ -136,10 +136,13 @@ GamessOutputParser::parse_mos(std::ifstream &gamessout)
         outfile->Printf("\n");
     }
 #endif
-    if(nso_ != gamess_mos.size()){
+    if(H_found_ && (nso_ != gamess_mos.size())){
         std::cerr << "NSO found in H " << nso_ << " doesn't match the " << gamess_mos.size() << " found in C." << std::endl;
         exit(1);
     }
+    else if(!H_found_)
+        nso_ = gamess_mos.size();
+
     nmo_ = gamess_mos[0].size();
     CGamess_ = SharedMatrix(new Matrix("C from GAMESS", nso_, nmo_));
     for(int row = 0; row < nso_; ++row){
@@ -430,27 +433,34 @@ GamessOutputParser::build_U_and_rotate()
     C_ = SharedMatrix(new Matrix("C reordered for Psi4", nso, nmo));
     // C = U Cgamess
     C_->gemm(false, false, 1.0, UC_, CGamess_, 0.0);
-    H_ = SharedMatrix(new Matrix("H reordered for Psi4", nso, nso));
-    // H = Ut Hgamess U
-    H_->back_transform(HGamess_, UH_);
+
+    if(H_found_)
+    {
+        H_ = SharedMatrix(new Matrix("H reordered for Psi4", nso, nso));
+        // H = Ut Hgamess U
+        H_->back_transform(HGamess_, UH_);
+    }
 
     if(options_.get_int("PRINT") > 1){
-        CGamess_->print();
-        HGamess_->print();
-        UC_->print();
-        CGamess_->print();
-        C_->print();
         wfn->Ca()->print();
-        UH_->print();
-        H_->print();
-        wfn->H()->print();
+        CGamess_->print();
+        UC_->print();
+        C_->print();
+
+        if(H_found_)
+        {
+            HGamess_->print();
+            UH_->print();
+            H_->print();
+            wfn->H()->print();
+        }
     }
     //exit(1);
 }
 
 
 GamessOutputParser::GamessOutputParser(Options &options):
-    options_(options)
+    options_(options), H_found_(false)
 {
 
     // The gamess output file
@@ -459,7 +469,7 @@ GamessOutputParser::GamessOutputParser(Options &options):
         throw PSIEXCEPTION("Unable to open the GAMESS output file.");
 
     bool mos_found = false;
-    bool H_found = false;
+
     // A line with only spaces and "EIGENVECTORS" marks the start of the MO coefficients
     boost::regex evecs_label_re("^\\s+EIGENVECTORS\\s*$");
     boost::regex H_label_re("BARE NUCLEUS HAMILTONIAN INTEGRALS");
@@ -473,12 +483,14 @@ GamessOutputParser::GamessOutputParser(Options &options):
         }
         // Look for the start of the H definition
         if (regex_search(line, matchobj, H_label_re)){
-            H_found = true;
+            H_found_ = true;
             parse_H(gamessout);
         }
     }
-    if(!H_found)
-        throw PSIEXCEPTION("No H matrix was found in the GAMESS output file provided");
+
+    if(!H_found_)
+        outfile->Printf("WARNING - No H matrix was found in the GAMESS output file provided\n");
+
     if(!mos_found)
         throw PSIEXCEPTION("No MOs were found in the GAMESS output file provided");
     build_U_and_rotate();

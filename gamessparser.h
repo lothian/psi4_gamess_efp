@@ -33,6 +33,9 @@ class GamessOutputParser{
     /// The number of SOs found in the H and C matrices
     int nso_;
 
+    /// H matrix included in the output
+    bool H_found_; 
+
     /// Reads a stream, to parse for MO coefficients
     void parse_mos(std::ifstream &gamessout);
     /// Reads a stream, to parse for the core Hamiltonian

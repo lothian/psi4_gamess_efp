@@ -1,9 +1,11 @@
 __init__.pyc
 output.dat
 psi.timer.dat
+timer.dat
 efp.o
 gamessparser.o
 psi4_gamess_efp.so
 psi4_gamess_efp.o
 pymodule.pyc
 *.swp
+*.clean
