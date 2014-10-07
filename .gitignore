@@ -1,8 +1,9 @@
 __init__.pyc
-mos.d
-mos.o
 output.dat
 psi.timer.dat
-psi4_gamess_mos.so
+efp.o
+gamessparser.o
+psi4_gamess_efp.so
+psi4_gamess_efp.o
 pymodule.pyc
 *.swp
