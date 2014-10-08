@@ -24,10 +24,17 @@ set {
   gamess_output_file gamess.out
 }
 
-#energy('ccsd')
 
-scf_helper('ccsd')
+scf_helper('hf')
 mints = psi4.MintsHelper()
 mints.integrals()
 plugin("./psi4_gamess_efp.so")
-#psi4.transqt2()
+
+set {
+    guess read
+    maxiter 0
+}
+
+#energy("psi4_gamess_efp")
+energy("hf")
+psi4.transqt2()

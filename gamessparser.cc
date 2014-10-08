@@ -5,6 +5,9 @@
 #include "libmints/matrix.h"
 #include "libmints/wavefunction.h"
 #include "libmints/basisset.h"
+#include "libpsio/psio.hpp"
+#include "libchkpt/chkpt.hpp"
+#include "psifiles.h"
 #include <fstream>
 #include <vector>
 
@@ -454,7 +457,15 @@ GamessOutputParser::build_U_and_rotate()
             H_->print();
             wfn->H()->print();
         }
+
+
     }
+
+    wfn->Ca()->copy(C_);
+    wfn->Cb()->copy(C_);
+
+    wfn->save();
+
     //exit(1);
 }
 
