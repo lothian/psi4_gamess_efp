@@ -53,6 +53,14 @@ PsiReturnType psi4_gamess_efp(Options& options)
 
     GamessOutputParser gparser(options);
 
+
+    double energy = wfn->compute_E();
+
+    std::cout.precision(20);
+    std::cout << "**********************************************\n";
+    std::cout << "* GAMESS/EFP ENERGY: " << energy << "\n";
+    std::cout << "**********************************************\n";
+
     return Success;
 }
 

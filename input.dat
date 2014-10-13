@@ -26,15 +26,7 @@ set {
 
 
 scf_helper('hf')
-mints = psi4.MintsHelper()
-mints.integrals()
+#mints = psi4.MintsHelper()
+#mints.integrals()
 plugin("./psi4_gamess_efp.so")
-
-set {
-    guess read
-    maxiter 0
-}
-
-#energy("psi4_gamess_efp")
-energy("hf")
-psi4.transqt2()
+#psi4.transqt2()

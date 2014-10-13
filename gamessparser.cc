@@ -64,7 +64,7 @@ GamessOutputParser::parse_H(std::ifstream &gamessout)
                         std::cout << "CANNOT CONVERT " << matchobj[i] << " TO DOUBLE";
                         exit(1);
                     }
-                    std::cout << "setting " << currow << " , " << startrow + i - 2 << "\n";
+
                     (*HGamess_)(currow, startrow + i - 2) = val;
                     (*HGamess_)(startrow + i - 2, currow) = val;
                 }
