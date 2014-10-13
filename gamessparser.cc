@@ -22,6 +22,11 @@
 //  4  O  1 YY   -0.001200  -0.024227  -0.000911  -0.019347  -0.000197
 //  5  O  1 ZZ    0.000297   0.016964  -0.000570  -0.011462  -0.000066
 boost::regex coefs_re("^\\s+(\\d+)\\s+[A-Z]+\\s+\\d+\\s+[SXYZ]+" SPACEFLOAT SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?\\s*$");
+boost::regex barenuc_re("^\\s+(\\d+)\\s+[A-Z]+\\s+\\d+\\s+[SXYZ]+" SPACEFLOAT SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?\\s*$");
+boost::regex barenuc_end("^\\s+KINETIC ENERGY INTEGRALS\\s*$");
+
+boost::regex nso_re("^\\s+NUMBER OF CARTESIAN GAUSSIAN BASIS FUNCTIONS =\\s*(\\d+)\\s*$");
+
 // Regex objects to define regular expressions and capture match results
 boost::smatch matchobj;
 
@@ -30,42 +35,53 @@ namespace psi{
 void
 GamessOutputParser::parse_H(std::ifstream &gamessout)
 {
-    std::vector< std::vector<double> > gamess_H;
-    int nmisses = 0;
-    while(gamessout.good()){
+    if(nso_ == 0)
+        throw PSIEXCEPTION("I should have the number of SOs by now...");
+
+    HGamess_ = SharedMatrix(new Matrix("H from GAMESS", nso_, nso_));
+
+    // zero indexed rows!
+    int startrow = 0;
+    int currow = 0;
+
+    bool newblock = true;
+
+    while(gamessout.good())
+    {
         std::string line;
         std::getline(gamessout, line);
         // Look for something like the following...
-        if (regex_match(line, matchobj, coefs_re)){
-            nmisses = 0;
-            std::vector<double> temp;
-            int so = boost::lexical_cast<int>(matchobj[1])-1;
-            for (int i = 2; i < matchobj.size(); ++i){
-                if(matchobj[i].length()){
+        if (regex_match(line, matchobj, barenuc_re)){
+            //int so = boost::lexical_cast<int>(matchobj[1])-1;
+            newblock = false;
+            for (int i = 2; i < matchobj.size(); ++i)
+            {
+                if(matchobj[i].length())
+                {
                     double val;
                     try {val = boost::lexical_cast<double>(matchobj[i]);
                     }catch(...){
                         std::cout << "CANNOT CONVERT " << matchobj[i] << " TO DOUBLE";
                         exit(1);
                     }
-                    temp.push_back(val);
+                    std::cout << "setting " << currow << " , " << startrow + i - 2 << "\n";
+                    (*HGamess_)(currow, startrow + i - 2) = val;
+                    (*HGamess_)(startrow + i - 2, currow) = val;
                 }
             }
-            if(so >= gamess_H.size())
-                // We haven't found any of these SOs yet; add this vector.
-                gamess_H.push_back(temp);
-            else
-                // We already have some MOs for this SO; append the current set.
-                gamess_H[so].insert(gamess_H[so].end(), temp.begin(), temp.end());
-        }else{
-            // This isn't a matrix entry
-            nmisses++;
+            currow++;
         }
-        if(nmisses > 3){
-            // It's been 4 lines since we saw a valid entry; we're done.
+        else if(regex_match(line, barenuc_end))
             break;
+        else if(!newblock)
+        {
+            // begin next block
+            newblock = true;
+            startrow += 5; // should be safe, even at the end, since we break right after
+            currow = startrow;
         }
     }
+
 #if 0
     std::vector< std::vector<double> >::const_iterator row_iter;
     std::vector<double>::const_iterator col_iter;
@@ -77,14 +93,6 @@ GamessOutputParser::parse_H(std::ifstream &gamessout)
         outfile->Printf("\n");
     }
 #endif
-    nso_ = gamess_H.size();
-    HGamess_ = SharedMatrix(new Matrix("H from GAMESS", nso_, nso_));
-    for(int row = 0; row < nso_; ++row){
-        for(int col = 0; col <= row; ++col){
-            HGamess_->set(row, col, gamess_H[row][col]);
-            HGamess_->set(col, row, gamess_H[row][col]);
-        }
-    }
 }
 
 
@@ -139,14 +147,12 @@ GamessOutputParser::parse_mos(std::ifstream &gamessout)
         outfile->Printf("\n");
     }
 #endif
-    if(H_found_ && (nso_ != gamess_mos.size())){
-        std::cerr << "NSO found in H " << nso_ << " doesn't match the " << gamess_mos.size() << " found in C." << std::endl;
-        exit(1);
-    }
-    else if(!H_found_)
-        nso_ = gamess_mos.size();
 
     nmo_ = gamess_mos[0].size();
+
+    if(gamess_mos.size() != nso_)
+        throw PSIEXCEPTION("Error - Number of SOs doesn't match C!");
+
     CGamess_ = SharedMatrix(new Matrix("C from GAMESS", nso_, nmo_));
     for(int row = 0; row < nso_; ++row){
         for(int col = 0; col < nmo_; ++col){
@@ -473,6 +479,7 @@ GamessOutputParser::build_U_and_rotate()
 GamessOutputParser::GamessOutputParser(Options &options):
     options_(options), H_found_(false)
 {
+    nso_ = 0;
 
     // The gamess output file
     std::ifstream gamessout(options.get_str("GAMESS_OUTPUT_FILE").c_str());
@@ -487,6 +494,19 @@ GamessOutputParser::GamessOutputParser(Options &options):
     while(gamessout.good()){
         std::string line;
         std::getline(gamessout, line);
+        if(regex_match(line, matchobj, nso_re))
+        {
+            try
+            {
+                nso_ = boost::lexical_cast<int>(matchobj[1]);
+                std::cout << "====NSO: " << nso_ << "\n";
+            }
+            catch(...)
+            {
+                        std::cout << "CANNOT CONVERT " << matchobj[1] << " TO INT";
+                        exit(1);
+            }
+        }
         // Look for the start of the H matrix definition
         if (regex_match(line, matchobj, evecs_label_re)){
             mos_found = true;
