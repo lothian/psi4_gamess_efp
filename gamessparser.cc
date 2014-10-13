@@ -494,11 +494,12 @@ GamessOutputParser::build_U_and_rotate()
 
     C_DGEMM('N','T',nso,nso,nocc,1.0,Cptr[0],nmo,Cptr[0],nmo,0.0,Dptr[0],nso);
 
+/*
     std::cout << "Da: " << wfn->Da()->rowspi()[0] << " x " << wfn->Db()->colspi()[0] << "\n";
     std::cout << "Db: " << wfn->Db()->rowspi()[0] << " x " << wfn->Db()->colspi()[0] << "\n";
     std::cout << " D: " << D->rowspi()[0]         << " x " << D->colspi()[0] << "\n";
     std::cout << "C_: " << C_->rowspi()[0]        << " x " << C_->colspi()[0] << "\n";
-
+*/
     wfn->Da()->copy(D);
     wfn->Db()->copy(D);
 
@@ -531,7 +532,8 @@ GamessOutputParser::GamessOutputParser(Options &options):
             try
             {
                 nao_ = boost::lexical_cast<int>(matchobj[1]);
-                std::cout << "====NSO: " << nao_ << "\n";
+                nmo_ = nao_; // gamess doesn't print nmo if it is the same as nao?
+                //std::cout << "====NSO: " << nao_ << "\n";
             }
             catch(...)
             {
@@ -544,7 +546,7 @@ GamessOutputParser::GamessOutputParser(Options &options):
             try
             {
                 nmo_ = boost::lexical_cast<int>(matchobj[1]);
-                std::cout << "====NMO: " << nmo_ << "\n";
+                //std::cout << "====NMO: " << nmo_ << "\n";
             }
             catch(...)
             {
