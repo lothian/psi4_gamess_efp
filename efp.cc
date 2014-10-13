@@ -58,6 +58,7 @@ PsiReturnType psi4_gamess_efp(Options& options)
 
     std::cout.precision(20);
     std::cout << "**********************************************\n";
+    std::cout << "        PSI4 ENERGY: " << wfn->reference_energy() << "\n";
     std::cout << "* GAMESS/EFP ENERGY: " << energy << "\n";
     std::cout << "**********************************************\n";
 

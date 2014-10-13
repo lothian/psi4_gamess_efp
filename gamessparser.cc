@@ -8,6 +8,7 @@
 #include "libpsio/psio.hpp"
 #include "libchkpt/chkpt.hpp"
 #include "psifiles.h"
+#include "libqt/qt.h"
 #include <fstream>
 #include <vector>
 
@@ -25,7 +26,8 @@ boost::regex coefs_re("^\\s+(\\d+)\\s+[A-Z]+\\s+\\d+\\s+[SXYZ]+" SPACEFLOAT SPAC
 boost::regex barenuc_re("^\\s+(\\d+)\\s+[A-Z]+\\s+\\d+\\s+[SXYZ]+" SPACEFLOAT SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?\\s*$");
 boost::regex barenuc_end("^\\s+KINETIC ENERGY INTEGRALS\\s*$");
 
-boost::regex nso_re("^\\s+NUMBER OF CARTESIAN GAUSSIAN BASIS FUNCTIONS =\\s*(\\d+)\\s*$");
+boost::regex nao_re("^\\s+NUMBER OF CARTESIAN GAUSSIAN BASIS FUNCTIONS =\\s*(\\d+)\\s*$");
+boost::regex nmo_re("^\\s+TOTAL NUMBER OF MOS IN VARIATION SPACE=\\s*(\\d+)\\s*$");
 
 // Regex objects to define regular expressions and capture match results
 boost::smatch matchobj;
@@ -35,10 +37,10 @@ namespace psi{
 void
 GamessOutputParser::parse_H(std::ifstream &gamessout)
 {
-    if(nso_ == 0)
+    if(nao_ == 0)
         throw PSIEXCEPTION("I should have the number of SOs by now...");
 
-    HGamess_ = SharedMatrix(new Matrix("H from GAMESS", nso_, nso_));
+    HGamess_ = SharedMatrix(new Matrix("H from GAMESS", nao_, nao_));
 
     // zero indexed rows!
     int startrow = 0;
@@ -64,7 +66,6 @@ GamessOutputParser::parse_H(std::ifstream &gamessout)
                         std::cout << "CANNOT CONVERT " << matchobj[i] << " TO DOUBLE";
                         exit(1);
                     }
-
                     (*HGamess_)(currow, startrow + i - 2) = val;
                     (*HGamess_)(startrow + i - 2, currow) = val;
                 }
@@ -148,13 +149,11 @@ GamessOutputParser::parse_mos(std::ifstream &gamessout)
     }
 #endif
 
-    nmo_ = gamess_mos[0].size();
+    if(gamess_mos[0].size() != nmo_)
+        throw PSIEXCEPTION("Error - Number of MOs doesn't match C!");
 
-    if(gamess_mos.size() != nso_)
-        throw PSIEXCEPTION("Error - Number of SOs doesn't match C!");
-
-    CGamess_ = SharedMatrix(new Matrix("C from GAMESS", nso_, nmo_));
-    for(int row = 0; row < nso_; ++row){
+    CGamess_ = SharedMatrix(new Matrix("C from GAMESS", nao_, nmo_));
+    for(int row = 0; row < nao_; ++row){
         for(int col = 0; col < nmo_; ++col){
             CGamess_->set(row, col, gamess_mos[row][col]);
         }
@@ -172,8 +171,8 @@ GamessOutputParser::build_U_and_rotate()
     int nao = basis->nao();
 
     // A quick sanity check
-    if(nao != nso_){
-        std::cerr << "Expected " << nao << " AOs, but got " << nso_ << std::endl;
+    if(nao != nao_){
+        std::cerr << "Expected " << nao << " AOs, but got " << nao_ << std::endl;
         exit(1);
     }
     if(nmo != nmo_){
@@ -446,7 +445,7 @@ GamessOutputParser::build_U_and_rotate()
     if(H_found_)
     {
         H_ = SharedMatrix(new Matrix("H reordered for Psi4", nso, nso));
-        // H = Ut Hgamess U
+        // H = U Hgamess Ut
         H_->back_transform(HGamess_, UH_);
     }
 
@@ -470,6 +469,39 @@ GamessOutputParser::build_U_and_rotate()
     wfn->Ca()->copy(C_);
     wfn->Cb()->copy(C_);
 
+    if(H_found_)
+    {
+        std::cout << "Found H: Storing....\n";
+        wfn->H()->copy(H_);
+    }
+
+    // form density matrix
+    // RHF, no symmetry
+    SharedMatrix D(new Matrix(nso, nso));
+    double** Dptr = D->pointer(0);
+    double** Cptr = C_->pointer(0);
+
+    int nocc = wfn->doccpi()[0];
+
+    /*
+    std::cout << "NOCC: " << nocc << "\n";
+    std::cout << "NAO_: " << nao_ << "\n";
+    std::cout << " NAO: " << nao  << "\n";
+    std::cout << "NMO_: " << nmo_ << "\n";
+    std::cout << " NMO: " << nmo  << "\n";
+    std::cout << " NSO: " << nso  << "\n";
+    */
+
+    C_DGEMM('N','T',nso,nso,nocc,1.0,Cptr[0],nmo,Cptr[0],nmo,0.0,Dptr[0],nso);
+
+    std::cout << "Da: " << wfn->Da()->rowspi()[0] << " x " << wfn->Db()->colspi()[0] << "\n";
+    std::cout << "Db: " << wfn->Db()->rowspi()[0] << " x " << wfn->Db()->colspi()[0] << "\n";
+    std::cout << " D: " << D->rowspi()[0]         << " x " << D->colspi()[0] << "\n";
+    std::cout << "C_: " << C_->rowspi()[0]        << " x " << C_->colspi()[0] << "\n";
+
+    wfn->Da()->copy(D);
+    wfn->Db()->copy(D);
+
     wfn->save();
 
     //exit(1);
@@ -479,7 +511,7 @@ GamessOutputParser::build_U_and_rotate()
 GamessOutputParser::GamessOutputParser(Options &options):
     options_(options), H_found_(false)
 {
-    nso_ = 0;
+    nao_ = 0;
 
     // The gamess output file
     std::ifstream gamessout(options.get_str("GAMESS_OUTPUT_FILE").c_str());
@@ -494,12 +526,25 @@ GamessOutputParser::GamessOutputParser(Options &options):
     while(gamessout.good()){
         std::string line;
         std::getline(gamessout, line);
-        if(regex_match(line, matchobj, nso_re))
+        if(regex_match(line, matchobj, nao_re))
         {
             try
             {
-                nso_ = boost::lexical_cast<int>(matchobj[1]);
-                std::cout << "====NSO: " << nso_ << "\n";
+                nao_ = boost::lexical_cast<int>(matchobj[1]);
+                std::cout << "====NSO: " << nao_ << "\n";
+            }
+            catch(...)
+            {
+                        std::cout << "CANNOT CONVERT " << matchobj[1] << " TO INT";
+                        exit(1);
+            }
+        }
+        if(regex_match(line, matchobj, nmo_re))
+        {
+            try
+            {
+                nmo_ = boost::lexical_cast<int>(matchobj[1]);
+                std::cout << "====NMO: " << nmo_ << "\n";
             }
             catch(...)
             {
@@ -524,6 +569,7 @@ GamessOutputParser::GamessOutputParser(Options &options):
 
     if(!mos_found)
         throw PSIEXCEPTION("No MOs were found in the GAMESS output file provided");
+
     build_U_and_rotate();
 }
 

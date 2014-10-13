@@ -30,8 +30,8 @@ class GamessOutputParser{
     SharedMatrix H_;
     /// The number of MOs found in the MO coefficients
     int nmo_;
-    /// The number of SOs found in the H and C matrices
-    int nso_;
+    /// The number of cartesnian AO
+    int nao_;
 
     /// H matrix included in the output
     bool H_found_; 
