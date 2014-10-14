@@ -16,8 +16,7 @@ no_com
 }
 
 set {
-  #basis aug-cc-pVDZ
-  basis sto-3g
+  basis aug-cc-pVDZ
   print 3
   df_scf_guess false
   scf_type pk

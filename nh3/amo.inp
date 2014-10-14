@@ -1,4 +1,4 @@
- $CONTRL ispher=1 scftyp=rhf $end
+ $CONTRL ispher=1 scftyp=rhf nprint=3 $end
  $basis gbasis=accd $end
  $scf dirscf=.t. $end
  $system memory=10000000 $end

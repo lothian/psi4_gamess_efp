@@ -37,7 +37,7 @@ CXXSRC = $(notdir $(wildcard *.cc))
 # Flags that were used to compile Psi4.
 CXX = /usr/bin/c++
 CXXDEFS = -DFC_SYMBOL=2
-CXXFLAGS = -O2 -fPIC -fopenmp
+CXXFLAGS = -O0 -g -fPIC -fopenmp
 INCLUDES = -I/usr/include -I/usr/include/python2.7 -I/usr/include/python2.7 -I/home/ben/programming/psi4/psi4/build/src/lib -I/home/ben/programming/psi4/psi4/src/lib -I/home/ben/programming/psi4/psi4/include -I/home/ben/programming/psi4/psi4/build/include
 OBJDIR = /home/ben/programming/psi4/psi4/build
 
