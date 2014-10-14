@@ -489,13 +489,20 @@ GamessOutputParser::build_U_and_rotate()
     wfn->save();
 
     // energies!
+    boost::shared_ptr<PSIO> psio(_default_psio_lib_);
+    boost::shared_ptr<Chkpt> chkpt(new Chkpt(psio, PSIO_OPEN_OLD));
+    double e_nuc = chkpt->rd_enuc();
+
     double one_electron_E = 2.0 * D->vector_dot(wfn->H());
     double two_electron_E = D->vector_dot(wfn->Fa()) - 0.5 * one_electron_E;
 
     std::cout.precision(20);
-    std::cout << "One electron: " << one_electron_E << "\n";
-    std::cout << "Two electron: " << two_electron_E << "\n";
-
+    std::cout << " One electron: " << one_electron_E << "\n";
+    std::cout << " Two electron: " << two_electron_E << "\n";
+    std::cout << "Nuc repulsion: " << e_nuc << "\n";
+    std::cout << "        TOTAL: " << one_electron_E +
+                                      two_electron_E +
+                                      e_nuc << "\n";
 
     //exit(1);
 }
