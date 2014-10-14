@@ -33,9 +33,6 @@ class GamessOutputParser{
     /// The number of cartesnian AO
     int nao_;
 
-    /// H matrix included in the output
-    bool H_found_; 
-
     /// Reads a stream, to parse for MO coefficients
     void parse_mos(std::ifstream &gamessout);
 

@@ -434,37 +434,45 @@ GamessOutputParser::build_U_and_rotate()
     // C = U Cgamess
     C_->gemm(false, false, 1.0, UC_, CGamess_, 0.0);
 
-    if(H_found_)
-    {
-        H_ = SharedMatrix(new Matrix("H reordered for Psi4", nso, nso));
-        // H = U Hgamess Ut
-        H_->back_transform(HGamess_, UH_);
-    }
+    H_ = SharedMatrix(new Matrix("H reordered for Psi4", nso, nso));
+    // H = U Hgamess Ut
+    H_->back_transform(HGamess_, UH_);
 
-    if(options_.get_int("PRINT") > 1){
+    if(options_.get_int("PRINT") > 1)
+    {
         wfn->Ca()->print();
         CGamess_->print();
         UC_->print();
         C_->print();
 
-        if(H_found_)
-        {
-            HGamess_->print();
-            UH_->print();
-            H_->print();
-            wfn->H()->print();
-        }
-
-
+        wfn->H()->print();
+        HGamess_->print();
+        UH_->print();
+        H_->print();
     }
 
     wfn->Ca()->copy(C_);
     wfn->Cb()->copy(C_);
 
-    if(H_found_)
+    // add the new terms
+    //wfn->H()->add(H_);
+    // or copy
+    wfn->H()->copy(H_);
+
+    if(options_.get_int("PRINT") > 1)
     {
-        std::cout << "Found H: Storing....\n";
-        wfn->H()->copy(H_);
+        outfile->Printf("******************************\n");
+        outfile->Printf("After stroring in wavefunction\n");
+        outfile->Printf("******************************\n");
+        wfn->Ca()->print();
+        CGamess_->print();
+        UC_->print();
+        C_->print();
+
+        wfn->H()->print();
+        HGamess_->print();
+        UH_->print();
+        H_->print();
     }
 
     // form density matrix
@@ -472,37 +480,29 @@ GamessOutputParser::build_U_and_rotate()
     SharedMatrix D(new Matrix(nso, nso));
     double** Dptr = D->pointer(0);
     double** Cptr = C_->pointer(0);
-
     int nocc = wfn->doccpi()[0];
-
-    /*
-    std::cout << "NOCC: " << nocc << "\n";
-    std::cout << "NAO_: " << nao_ << "\n";
-    std::cout << " NAO: " << nao  << "\n";
-    std::cout << "NMO_: " << nmo_ << "\n";
-    std::cout << " NMO: " << nmo  << "\n";
-    std::cout << " NSO: " << nso  << "\n";
-    */
-
     C_DGEMM('N','T',nso,nso,nocc,1.0,Cptr[0],nmo,Cptr[0],nmo,0.0,Dptr[0],nso);
 
-/*
-    std::cout << "Da: " << wfn->Da()->rowspi()[0] << " x " << wfn->Db()->colspi()[0] << "\n";
-    std::cout << "Db: " << wfn->Db()->rowspi()[0] << " x " << wfn->Db()->colspi()[0] << "\n";
-    std::cout << " D: " << D->rowspi()[0]         << " x " << D->colspi()[0] << "\n";
-    std::cout << "C_: " << C_->rowspi()[0]        << " x " << C_->colspi()[0] << "\n";
-*/
     wfn->Da()->copy(D);
     wfn->Db()->copy(D);
 
     wfn->save();
+
+    // energies!
+    double one_electron_E = 2.0 * D->vector_dot(wfn->H());
+    double two_electron_E = D->vector_dot(wfn->Fa()) - 0.5 * one_electron_E;
+
+    std::cout.precision(20);
+    std::cout << "One electron: " << one_electron_E << "\n";
+    std::cout << "Two electron: " << two_electron_E << "\n";
+
 
     //exit(1);
 }
 
 
 GamessOutputParser::GamessOutputParser(Options &options):
-    options_(options), H_found_(false)
+    options_(options)
 {
     nao_ = 0;
 
@@ -516,6 +516,11 @@ GamessOutputParser::GamessOutputParser(Options &options):
     // A line with only spaces and "EIGENVECTORS" marks the start of the MO coefficients
     boost::regex evecs_label_re("^\\s+EIGENVECTORS\\s*$");
     boost::regex H_label_re("BARE NUCLEUS HAMILTONIAN INTEGRALS");
+    boost::regex HEFC_label_re("EFC INTEGRALS");
+    boost::regex HEFC_label2_re("EFC +MATRIX \\(CHARGE DIPOLE\\)");
+    boost::regex HEFC_label3_re("EFC +MATRIX \\(CHARGE QUARUPOLE\\)");  //yes, spelling
+    boost::regex HEFC_label4_re("EFC +MATRIX \\(CHARGE OCTUPOLE\\)");
+
     while(gamessout.good()){
         std::string line;
         std::getline(gamessout, line);
@@ -551,15 +556,20 @@ GamessOutputParser::GamessOutputParser(Options &options):
             mos_found = true;
             parse_mos(gamessout);
         }
-        // Look for the start of the H definition
-        if (regex_search(line, matchobj, H_label_re)){
-            H_found_ = true;
-            HGamess_ = parse_integrals(gamessout, "H from GAMESS", "^\\s+KINETIC ENERGY INTEGRALS\\s*$");
-        }
-    }
 
-    if(!H_found_)
-        outfile->Printf("WARNING - No H matrix was found in the GAMESS output file provided\n");
+        // Look for the start of the H definition
+        if (regex_search(line, matchobj, H_label_re))
+            HGamess_ = parse_integrals(gamessout, "H from GAMESS", "^\\s+KINETIC ENERGY INTEGRALS\\s*$");
+        if (regex_search(line, matchobj, HEFC_label_re))
+            //HGamess_ = parse_integrals(gamessout, "H from GAMESS", "^.*END OF EFC.*");
+            HGamess_->add(parse_integrals(gamessout, "H from GAMESS", "^.*END OF EFC.*"));
+        if (regex_search(line, matchobj, HEFC_label2_re))
+            HGamess_->add(parse_integrals(gamessout, "H from GAMESS", "^.*END OF.*"));
+        if (regex_search(line, matchobj, HEFC_label3_re))
+            HGamess_->add(parse_integrals(gamessout, "H from GAMESS", "^.*END OF.*"));
+        if (regex_search(line, matchobj, HEFC_label4_re))
+            HGamess_->add(parse_integrals(gamessout, "H from GAMESS", "^.*END OF.*"));
+    }
 
     if(!mos_found)
         throw PSIEXCEPTION("No MOs were found in the GAMESS output file provided");
