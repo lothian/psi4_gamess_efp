@@ -23,8 +23,7 @@
 //  4  O  1 YY   -0.001200  -0.024227  -0.000911  -0.019347  -0.000197
 //  5  O  1 ZZ    0.000297   0.016964  -0.000570  -0.011462  -0.000066
 boost::regex coefs_re("^\\s+(\\d+)\\s+[A-Z]+\\s+\\d+\\s+[SXYZ]+" SPACEFLOAT SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?\\s*$");
-boost::regex barenuc_re("^\\s+(\\d+)\\s+[A-Z]+\\s+\\d+\\s+[SXYZ]+" SPACEFLOAT SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?\\s*$");
-boost::regex barenuc_end("^\\s+KINETIC ENERGY INTEGRALS\\s*$");
+boost::regex integral_re("^\\s+(\\d+)\\s+[A-Z]+\\s+\\d+\\s+[SXYZ]+" SPACEFLOAT SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?" SPACEFLOAT "?\\s*$");
 
 boost::regex nao_re("^\\s+NUMBER OF CARTESIAN GAUSSIAN BASIS FUNCTIONS =\\s*(\\d+)\\s*$");
 boost::regex nmo_re("^\\s+TOTAL NUMBER OF MOS IN VARIATION SPACE=\\s*(\\d+)\\s*$");
@@ -34,13 +33,16 @@ boost::smatch matchobj;
 
 namespace psi{
 
-void
-GamessOutputParser::parse_H(std::ifstream &gamessout)
+SharedMatrix
+GamessOutputParser::parse_integrals(std::ifstream &gamessout, const char * name,
+                                    const char * end)
 {
     if(nao_ == 0)
         throw PSIEXCEPTION("I should have the number of SOs by now...");
 
-    HGamess_ = SharedMatrix(new Matrix("H from GAMESS", nao_, nao_));
+    SharedMatrix integrals(new Matrix(name, nao_, nao_));
+
+    boost::regex int_end(end);
 
     // zero indexed rows!
     int startrow = 0;
@@ -53,7 +55,7 @@ GamessOutputParser::parse_H(std::ifstream &gamessout)
         std::string line;
         std::getline(gamessout, line);
         // Look for something like the following...
-        if (regex_match(line, matchobj, barenuc_re)){
+        if (regex_match(line, matchobj, integral_re)){
             //int so = boost::lexical_cast<int>(matchobj[1])-1;
             newblock = false;
             for (int i = 2; i < matchobj.size(); ++i)
@@ -66,13 +68,13 @@ GamessOutputParser::parse_H(std::ifstream &gamessout)
                         std::cout << "CANNOT CONVERT " << matchobj[i] << " TO DOUBLE";
                         exit(1);
                     }
-                    (*HGamess_)(currow, startrow + i - 2) = val;
-                    (*HGamess_)(startrow + i - 2, currow) = val;
+                    (*integrals)(currow, startrow + i - 2) = val;
+                    (*integrals)(startrow + i - 2, currow) = val;
                 }
             }
             currow++;
         }
-        else if(regex_match(line, barenuc_end))
+        else if(regex_match(line, int_end))
             break;
         else if(!newblock)
         {
@@ -83,17 +85,7 @@ GamessOutputParser::parse_H(std::ifstream &gamessout)
         }
     }
 
-#if 0
-    std::vector< std::vector<double> >::const_iterator row_iter;
-    std::vector<double>::const_iterator col_iter;
-    outfile->Printf("\nH parsed from file, in GAMESS format\n");
-    for(row_iter = gamess_H.begin(); row_iter < gamess_H.end(); ++row_iter){
-        for(col_iter = row_iter->begin(); col_iter < row_iter->end(); ++col_iter){
-            outfile->Printf("%9.6f ", *col_iter);
-        }
-        outfile->Printf("\n");
-    }
-#endif
+    return integrals;
 }
 
 
@@ -562,7 +554,7 @@ GamessOutputParser::GamessOutputParser(Options &options):
         // Look for the start of the H definition
         if (regex_search(line, matchobj, H_label_re)){
             H_found_ = true;
-            parse_H(gamessout);
+            HGamess_ = parse_integrals(gamessout, "H from GAMESS", "^\\s+KINETIC ENERGY INTEGRALS\\s*$");
         }
     }
 

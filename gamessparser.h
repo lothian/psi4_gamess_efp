@@ -38,8 +38,10 @@ class GamessOutputParser{
 
     /// Reads a stream, to parse for MO coefficients
     void parse_mos(std::ifstream &gamessout);
-    /// Reads a stream, to parse for the core Hamiltonian
-    void parse_H(std::ifstream &gamessout);
+
+    /// Reads a stream, to parse for various integrals (ie core hamiltonian, etc)
+    SharedMatrix parse_integrals(std::ifstream &gamessout, const char * name, const char * end);
+
     /// Forms the GAMESS->Psi4 reordering / renormalization matrix
     void build_U_and_rotate();
   public:
