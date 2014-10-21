@@ -438,55 +438,53 @@ GamessOutputParser::build_U_and_rotate()
     // H = U Hgamess Ut
     H_->back_transform(HGamess_, UH_);
 
-    if(options_.get_int("PRINT") > 1)
-    {
-        wfn->Ca()->print();
-        CGamess_->print();
-        UC_->print();
-        C_->print();
 
-        wfn->H()->print();
-        HGamess_->print();
-        UH_->print();
-        H_->print();
-    }
-
-    wfn->Ca()->copy(C_);
-    wfn->Cb()->copy(C_);
-
-    // add the new terms
-    //wfn->H()->add(H_);
-    // or copy
-    wfn->H()->copy(H_);
-
-    if(options_.get_int("PRINT") > 1)
-    {
-        outfile->Printf("******************************\n");
-        outfile->Printf("After stroring in wavefunction\n");
-        outfile->Printf("******************************\n");
-        wfn->Ca()->print();
-        CGamess_->print();
-        UC_->print();
-        C_->print();
-
-        wfn->H()->print();
-        HGamess_->print();
-        UH_->print();
-        H_->print();
-    }
 
     // form density matrix
     // RHF, no symmetry
-    SharedMatrix D(new Matrix(nso, nso));
+    SharedMatrix D(new Matrix("OPDM calculated from GAMESS C", nso, nso));
     double** Dptr = D->pointer(0);
     double** Cptr = C_->pointer(0);
     int nocc = wfn->doccpi()[0];
     C_DGEMM('N','T',nso,nso,nocc,1.0,Cptr[0],nmo,Cptr[0],nmo,0.0,Dptr[0],nso);
 
+    if(options_.get_int("PRINT") > 1)
+    {
+        wfn->Ca()->print();
+        CGamess_->print();
+        UC_->print();
+        C_->print();
+
+        wfn->H()->print();
+        HGamess_->print();
+        UH_->print();
+        H_->print();
+        D->print();
+    }
+
+    // Store everything!
     wfn->Da()->copy(D);
     wfn->Db()->copy(D);
-
+    wfn->Ca()->copy(C_);
+    wfn->Cb()->copy(C_);
+    wfn->H()->copy(H_);
     wfn->save();
+
+    if(options_.get_int("PRINT") > 1)
+    {
+        outfile->Printf("******************************\n");
+        outfile->Printf("After storing in wavefunction\n");
+        outfile->Printf("******************************\n");
+        wfn->Ca()->print();
+        CGamess_->print();
+        UC_->print();
+        C_->print();
+
+        wfn->H()->print();
+        HGamess_->print();
+        UH_->print();
+        H_->print();
+    }
 
     // energies!
     boost::shared_ptr<PSIO> psio(_default_psio_lib_);
@@ -497,6 +495,9 @@ GamessOutputParser::build_U_and_rotate()
     double two_electron_E = D->vector_dot(wfn->Fa()) - 0.5 * one_electron_E;
 
     std::cout.precision(20);
+    std::cout << "*********************************\n";
+    std::cout << "* Calculated from gamess output:\n";
+    std::cout << "*********************************\n";
     std::cout << " One electron: " << one_electron_E << "\n";
     std::cout << " Two electron: " << two_electron_E << "\n";
     std::cout << "Nuc repulsion: " << e_nuc << "\n";
@@ -522,11 +523,9 @@ GamessOutputParser::GamessOutputParser(Options &options):
 
     // A line with only spaces and "EIGENVECTORS" marks the start of the MO coefficients
     boost::regex evecs_label_re("^\\s+EIGENVECTORS\\s*$");
-    boost::regex H_label_re("BARE NUCLEUS HAMILTONIAN INTEGRALS");
-    boost::regex HEFC_label_re("EFC INTEGRALS");
-    boost::regex HEFC_label2_re("EFC +MATRIX \\(CHARGE DIPOLE\\)");
-    boost::regex HEFC_label3_re("EFC +MATRIX \\(CHARGE QUARUPOLE\\)");  //yes, spelling
-    boost::regex HEFC_label4_re("EFC +MATRIX \\(CHARGE OCTUPOLE\\)");
+    //boost::regex H_label_re("BARE NUCLEUS HAMILTONIAN INTEGRALS");
+    boost::regex EFPSTAT_label_re("BENNYP EFSTAT");
+    boost::regex EFPPOL_label_re("BENNYP EPOLI");
 
     while(gamessout.good()){
         std::string line;
@@ -565,17 +564,11 @@ GamessOutputParser::GamessOutputParser(Options &options):
         }
 
         // Look for the start of the H definition
-        if (regex_search(line, matchobj, H_label_re))
-            HGamess_ = parse_integrals(gamessout, "H from GAMESS", "^\\s+KINETIC ENERGY INTEGRALS\\s*$");
-        if (regex_search(line, matchobj, HEFC_label_re))
-            //HGamess_ = parse_integrals(gamessout, "H from GAMESS", "^.*END OF EFC.*");
-            HGamess_->add(parse_integrals(gamessout, "H from GAMESS", "^.*END OF EFC.*"));
-        if (regex_search(line, matchobj, HEFC_label2_re))
-            HGamess_->add(parse_integrals(gamessout, "H from GAMESS", "^.*END OF.*"));
-        if (regex_search(line, matchobj, HEFC_label3_re))
-            HGamess_->add(parse_integrals(gamessout, "H from GAMESS", "^.*END OF.*"));
-        if (regex_search(line, matchobj, HEFC_label4_re))
-            HGamess_->add(parse_integrals(gamessout, "H from GAMESS", "^.*END OF.*"));
+        // EPOLI comes first!
+        if (regex_search(line, matchobj, EFPPOL_label_re))
+            HGamess_ = parse_integrals(gamessout, "H from GAMESS", "^.*END BENNYP.*");
+        if (regex_search(line, matchobj, EFPSTAT_label_re))
+            HGamess_->add(parse_integrals(gamessout, "H from GAMESS", "^.*END BENNYP.*"));
     }
 
     if(!mos_found)

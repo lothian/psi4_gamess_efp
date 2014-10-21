@@ -58,10 +58,10 @@ PsiReturnType psi4_gamess_efp(Options& options)
     double energy = wfn->compute_E();
 
     std::cout.precision(20);
-    std::cout << "**********************************************\n";
-    std::cout << "        PSI4 ENERGY: " << wfn->reference_energy() << "\n";
-    std::cout << "* GAMESS/EFP ENERGY: " << energy << "\n";
-    std::cout << "**********************************************\n";
+    std::cout << "**********************************************************\n";
+    std::cout << "*     ORIGINAL PSI4 ENERGY: " << wfn->reference_energy() << "\n";
+    std::cout << "* NEW WFN COMPUTE_E ENERGY: " << energy << "\n";
+    std::cout << "**********************************************************\n";
 
     return Success;
 }
