@@ -26,7 +26,14 @@ set {
 
 
 scf_helper('hf')
-#mints = psi4.MintsHelper()
+mints = psi4.MintsHelper()
 #mints.integrals()
 plugin("./psi4_gamess_efp.so")
-#psi4.transqt2()
+psi4.transqt2()
+#dip = mints.so_dipole()
+#mat = dip[0]
+#mat.print_out()
+#print("DONE")
+oe = OEProp()
+oe.add("DIPOLE")
+oe.compute()

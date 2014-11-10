@@ -4,6 +4,7 @@
 #include "liboptions/liboptions.h"
 #include "libmints/matrix.h"
 #include "libmints/wavefunction.h"
+//#include "libmints/oeprop.h"
 #include "libmints/basisset.h"
 #include "libpsio/psio.hpp"
 #include "libchkpt/chkpt.hpp"
@@ -462,11 +463,26 @@ GamessOutputParser::build_U_and_rotate()
         D->print();
     }
 
+    // calculate one electron energy with original psi information
+    // and then with just modified density
+    double one_electron_psi    = 2.0 * wfn->Da()->vector_dot(wfn->H());
+    double one_electron_cmod   = 2.0 * D->vector_dot(wfn->H());
+    double one_electron_gamess = 2.0 * D->vector_dot(H_);
+
     // Store everything!
     wfn->Da()->copy(D);
     wfn->Db()->copy(D);
     wfn->Ca()->copy(C_);
     wfn->Cb()->copy(C_);
+
+    // dipole only modifying C/D
+    /*
+    boost::shared_ptr<OEProp> oe2(new OEProp());
+    oe2->add("DIPOLE");
+    outfile->Printf( "  ==> Properties/Only CMod <==\n\n");
+    oe2->compute();
+    */
+
     wfn->H()->copy(H_);
     wfn->save();
 
@@ -491,7 +507,8 @@ GamessOutputParser::build_U_and_rotate()
     boost::shared_ptr<Chkpt> chkpt(new Chkpt(psio, PSIO_OPEN_OLD));
     double e_nuc = chkpt->rd_enuc();
 
-    double one_electron_E = 2.0 * D->vector_dot(wfn->H());
+    // should match one_electron_gamess above
+    double one_electron_E = 2.0 * wfn->Da()->vector_dot(wfn->H());
     double two_electron_E = D->vector_dot(wfn->Fa()) - 0.5 * one_electron_E;
 
     std::cout.precision(20);
@@ -504,6 +521,24 @@ GamessOutputParser::build_U_and_rotate()
     std::cout << "        TOTAL: " << one_electron_E +
                                       two_electron_E +
                                       e_nuc << "\n";
+
+
+    std::cout << "*********************************\n";
+    std::cout << "* One electron energy:\n";
+    std::cout << "*********************************\n";
+    std::cout << "Originally from PSI4: " << one_electron_psi << "\n";
+    std::cout << "  Just modifying MOs: " << one_electron_cmod << "\n";
+    std::cout << "Modifying MOs and H1: " << one_electron_gamess << "\n";
+    std::cout << "        Double check: " << one_electron_E << "\n";
+
+
+    // properties
+    /*
+    boost::shared_ptr<OEProp> oe(new OEProp());
+    oe->add("DIPOLE");
+    outfile->Printf( "  ==> Properties/GAMESS <==\n\n");
+    oe->compute();
+    */
 
     //exit(1);
 }
