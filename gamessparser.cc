@@ -43,8 +43,6 @@ GamessOutputParser::parse_integrals(std::ifstream &gamessout, const char * name,
 
     SharedMatrix integrals(new Matrix(name, nao_, nao_));
 
-    std::cout << "Name, nao: " << name << "    " << nao_ << "\n";
-
     boost::regex int_end(end);
 
     // zero indexed rows!
@@ -622,7 +620,7 @@ GamessOutputParser::GamessOutputParser(Options &options):
         {
             if (regex_search(line, matchobj, EFP_FAKE_H_re))
             {
-                std::cout << "FOUND FAKE H\n";
+                //std::cout << "FOUND FAKE H\n";
                 HGamess_ = parse_integrals(gamessout, "H from GAMESS", "^.*KINETIC ENERGY.*");
             }
         }
