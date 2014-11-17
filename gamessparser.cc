@@ -43,6 +43,8 @@ GamessOutputParser::parse_integrals(std::ifstream &gamessout, const char * name,
 
     SharedMatrix integrals(new Matrix(name, nao_, nao_));
 
+    std::cout << "Name, nao: " << name << "    " << nao_ << "\n";
+
     boost::regex int_end(end);
 
     // zero indexed rows!
@@ -470,10 +472,15 @@ GamessOutputParser::build_U_and_rotate()
     double one_electron_gamess = 2.0 * D->vector_dot(H_);
 
     // Store everything!
-    wfn->Da()->copy(D);
-    wfn->Db()->copy(D);
-    wfn->Ca()->copy(C_);
-    wfn->Cb()->copy(C_);
+    if(options_.get_str("GAMESS_INCLUDE_C") == "TRUE")
+    {
+        wfn->Da()->copy(D);
+        wfn->Db()->copy(D);
+        wfn->Ca()->copy(C_);
+        wfn->Cb()->copy(C_);
+    }
+    else
+        std::cout << "SKIPPING INCLUDING C...\n";
 
     // dipole only modifying C/D
     /*
@@ -483,8 +490,17 @@ GamessOutputParser::build_U_and_rotate()
     oe2->compute();
     */
 
-    wfn->H()->copy(H_);
+    if(options_.get_str("GAMESS_INCLUDE_H") == "TRUE")
+    {
+        wfn->H()->copy(H_);
+    }
+    else
+        std::cout << "SKIPPING INCLUDING H...\n";
+
+
     wfn->save();
+    wfn->dump_to_checkpoint();
+
 
     if(options_.get_int("PRINT") > 1)
     {
@@ -558,9 +574,11 @@ GamessOutputParser::GamessOutputParser(Options &options):
 
     // A line with only spaces and "EIGENVECTORS" marks the start of the MO coefficients
     boost::regex evecs_label_re("^\\s+EIGENVECTORS\\s*$");
-    //boost::regex H_label_re("BARE NUCLEUS HAMILTONIAN INTEGRALS");
+    boost::regex EFP_FAKE_H_re("BARE NUCLEUS HAMILTONIAN INTEGRALS.*");
     boost::regex EFPSTAT_label_re("BENNYP EFSTAT");
     boost::regex EFPPOL_label_re("BENNYP EPOLI");
+
+    bool fakeh = (options.get_str("GAMESS_FAKE_H") == "TRUE");
 
     while(gamessout.good()){
         std::string line;
@@ -592,7 +610,7 @@ GamessOutputParser::GamessOutputParser(Options &options):
                         exit(1);
             }
         }
-        // Look for the start of the H matrix definition
+        // Look for the start of the C matrix definition
         if (regex_match(line, matchobj, evecs_label_re)){
             mos_found = true;
             parse_mos(gamessout);
@@ -600,10 +618,21 @@ GamessOutputParser::GamessOutputParser(Options &options):
 
         // Look for the start of the H definition
         // EPOLI comes first!
-        if (regex_search(line, matchobj, EFPPOL_label_re))
-            HGamess_ = parse_integrals(gamessout, "H from GAMESS", "^.*END BENNYP.*");
-        if (regex_search(line, matchobj, EFPSTAT_label_re))
-            HGamess_->add(parse_integrals(gamessout, "H from GAMESS", "^.*END BENNYP.*"));
+        if (fakeh)
+        {
+            if (regex_search(line, matchobj, EFP_FAKE_H_re))
+            {
+                std::cout << "FOUND FAKE H\n";
+                HGamess_ = parse_integrals(gamessout, "H from GAMESS", "^.*KINETIC ENERGY.*");
+            }
+        }
+        else
+        {
+            if (regex_search(line, matchobj, EFPPOL_label_re))
+                HGamess_ = parse_integrals(gamessout, "H from GAMESS", "^.*END BENNYP.*");
+            if (regex_search(line, matchobj, EFPSTAT_label_re))
+                HGamess_->add(parse_integrals(gamessout, "H from GAMESS", "^.*END BENNYP.*"));
+        }
     }
 
     if(!mos_found)

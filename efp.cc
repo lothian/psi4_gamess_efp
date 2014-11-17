@@ -27,6 +27,9 @@ int read_options(std::string name, Options& options)
         /*- The amount of information printed to the output file -*/
         options.add_int("PRINT", 1);
         options.add_str_i("GAMESS_OUTPUT_FILE", "");
+        options.add_str("GAMESS_FAKE_H", "FALSE", "FALSE TRUE");
+        options.add_str("GAMESS_INCLUDE_H", "TRUE", "FALSE TRUE");
+        options.add_str("GAMESS_INCLUDE_C", "TRUE", "FALSE TRUE");
     }
 
     return true;
